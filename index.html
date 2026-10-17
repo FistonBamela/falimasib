@@ -1411,12 +1411,12 @@ function boot(REMOTE, STATE) {
     var list = gid("adList"); list.innerHTML = "";
     var items = adsSorted();
     var empty = !items.length;
-    var sec = gid("ads"); if (sec) sec.hidden = empty && !ADMIN;
-    document.querySelectorAll("[data-adlink]").forEach(function (n) { n.hidden = empty && !ADMIN; });
+    var sec = gid("ads"); if (sec) sec.hidden = false;
+    document.querySelectorAll("[data-adlink]").forEach(function (n) { n.hidden = false; });
     if (empty) {
       var e = mk("div", "art-empty");
       e.appendChild(mk("strong", null, "Aucune publicité pour le moment."));
-      e.appendChild(mk("p", null, ADMIN ? "Cliquez sur « Nouvelle publicité » pour ajouter la première." : ""));
+      e.appendChild(mk("p", null, ADMIN ? "Cliquez sur « Nouvelle publicité » pour ajouter la première." : "Les prochaines annonces apparaîtront ici."));
       list.appendChild(e); return;
     }
     items.forEach(function (a) { list.appendChild(adCard(a)); });
