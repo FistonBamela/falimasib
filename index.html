@@ -564,6 +564,19 @@ window.CLOUD = {
       <label for="l-behance">Behance ou Drive<input id="l-behance" data-link="Portfolio" type="url" placeholder="https://..." value=""></label>
       <label for="l-whatsapp">WhatsApp<input id="l-whatsapp" data-link="WhatsApp" type="url" placeholder="https://wa.me/243820262854" value="https://wa.me/message/PTLVNKOAWMCSH1"></label>
     </div>
+    <div class="colors" id="gcPanel">
+      <strong>Guide gratuit (chat)</strong>
+      <div class="fields">
+        <label>Nom du guide<input type="text" data-gc="nom" placeholder="Le guide des 20 animations à copier"></label>
+        <label>Lien du guide (Drive, PDF...)<input type="url" data-gc="lien" placeholder="https://drive.google.com/..."></label>
+        <label>Nom de la formation<input type="text" data-gc="formation" placeholder="Ta formation"></label>
+        <label>Prix en FC (francs congolais)<input type="text" inputmode="numeric" data-gc="prix" placeholder="5000"></label>
+        <label>Lien WhatsApp pour la preuve (sinon celui du Contact)<input type="url" data-gc="whatsapp" placeholder="https://wa.me/..."></label>
+        <label>Numéro M-Pesa<input type="text" inputmode="tel" data-gc="pay1" placeholder="0851388601"></label>
+        <label>Numéro Airtel Money<input type="text" inputmode="tel" data-gc="pay2" placeholder="0992131618"></label>
+        <label>Numéro Orange Money<input type="text" inputmode="tel" data-gc="pay3" placeholder="0820262854"></label>
+      </div>
+    </div>
     <div class="colors">
       <strong>Couleurs du site</strong>
       <div class="fields">
@@ -1151,6 +1164,15 @@ function boot(REMOTE, STATE) {
     inp.addEventListener("input", function () { store.links[name] = inp.value; save(); renderLinks(); });
   });
   renderLinks();
+
+  /* guide gratuit : champs du panneau <-> stockage (publié sur Supabase) */
+  store.guide = store.guide || {};
+  window.__GC_STORE = store;
+  document.querySelectorAll("[data-gc]").forEach(function (inp) {
+    var k = inp.getAttribute("data-gc");
+    if (typeof store.guide[k] === "string") inp.value = store.guide[k];
+    inp.addEventListener("input", function () { store.guide[k] = inp.value; save(); });
+  });
 
   /* export : fichier prêt à mettre en ligne */
   document.getElementById("exportBtn").addEventListener("click", function () {
@@ -1926,19 +1948,22 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 
 <script id="gc-js">
 (function(){
-/* =========== A MODIFIER ICI =========== */
-var NOM_GUIDE     = "Le guide des 20 animations à copier";
-var LIEN_GUIDE    = "COLLE_ICI_LE_LIEN_DE_TON_GUIDE";   // lien Google Drive / PDF
-var NOM_FORMATION = "Ta formation";                     // nom de ton cours payant
-var PRIX_CDF      = 5000;                               // prix en francs congolais
-var LIEN_WHATSAPP = "COLLE_ICI_LE_LIEN_WHATSAPP";       // lien WhatsApp pour la preuve de paiement
-var WEBHOOK_URL   = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
-var PAIEMENTS = [
-  {nom:"M-Pesa",        num:"0851388601"},
-  {nom:"Airtel Money",  num:"0992131618"},
-  {nom:"Orange Money",  num:"0820262854"}
-];
+/* ====== VALEURS PAR DEFAUT (modifiables depuis #modifier > « Guide gratuit (chat) ») ====== */
+var DEF = {
+  nom:"Le guide des 20 animations à copier", lien:"", formation:"Ta formation", prix:"5000",
+  whatsapp:"", pay1:"0851388601", pay2:"0992131618", pay3:"0820262854"
+};
+var WEBHOOK_URL = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
 /* ====================================== */
+var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS;
+function applyCfg(){
+  var st=window.__GC_STORE||{}, g=st.guide||{}, L=st.links||{};
+  function v(k){var x=(g[k]||'').toString().trim();return x||DEF[k]}
+  NOM_GUIDE=v('nom'); LIEN_GUIDE=v('lien'); NOM_FORMATION=v('formation');
+  PRIX_CDF=parseInt(String(v('prix')).replace(/\D/g,''),10)||5000;
+  LIEN_WHATSAPP=(g.whatsapp||'').trim()||(L.WhatsApp||'').trim()||(document.getElementById('l-whatsapp')||{}).value||'';
+  PAIEMENTS=[{nom:"M-Pesa",num:v('pay1')},{nom:"Airtel Money",num:v('pay2')},{nom:"Orange Money",num:v('pay3')}].filter(function(x){return x.num});
+}
 
 var $=function(id){return document.getElementById(id)};
 var modal=$('gcModal'), body=$('gcBody'), bar=$('gcBar').firstElementChild;
@@ -2022,7 +2047,7 @@ async function scenario(id){
   avance();envoie();
 
   await bot(id,"C'est envoyé ✅<br>Tu reçois ton guide par e-mail d'ici une minute.<br>Pense à regarder dans Promotions ou Spams.");
-  await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
+   if(/^https?:\/\//i.test(LIEN_GUIDE))await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
   avance();
 
   await bot(id,"<b>Envie d'aller plus loin ?</b><br>Dans la formation « "+esc(NOM_FORMATION)+" », tu apprends pas à pas, de l'idée à la version finie.");
@@ -2044,7 +2069,7 @@ async function scenario(id){
   b.querySelectorAll('button').forEach(function(bt){bt.onclick=function(){
     try{navigator.clipboard.writeText(bt.dataset.n)}catch(e){}
     bt.textContent='Copié ✓';setTimeout(function(){bt.textContent='Copier'},1500)}});
-  await bot(id,'<a class="gc-b" href="'+esc(LIEN_WHATSAPP)+'" target="_blank" rel="noopener">💬 Envoyer ma preuve sur WhatsApp</a>');
+  if(/^https?:\/\//i.test(LIEN_WHATSAPP))await bot(id,'<a class="gc-b" href="'+esc(LIEN_WHATSAPP)+'" target="_blank" rel="noopener">💬 Envoyer ma preuve sur WhatsApp</a>');
   avance();
 }
 function envoie(){
@@ -2055,6 +2080,7 @@ function envoie(){
 
 /* ---------- Ouvrir / fermer ---------- */
 function ouvre(){
+  applyCfg();
   run++;etape=0;bar.style.width='0';body.innerHTML='';saisie.style.display='none';
   modal.hidden=false;document.body.classList.add('noscroll');
   var id=run;
