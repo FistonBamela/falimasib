@@ -570,8 +570,11 @@ window.CLOUD = {
         <label>Lien du formulaire Brevo (envoie l'e-mail)<input type="url" data-gc="brevo" placeholder="https://xxxx.sibforms.com/serve/..."></label>
         <label>Nom du guide<input type="text" data-gc="nom" placeholder="Le guide des 20 animations à copier"></label>
         <label>Lien du guide (Drive, PDF...)<input type="url" data-gc="lien" placeholder="https://drive.google.com/..."></label>
-        <label>Nom de la formation<input type="text" data-gc="formation" placeholder="Ta formation"></label>
-        <label>Prix en FC (francs congolais)<input type="text" inputmode="numeric" data-gc="prix" placeholder="5000"></label>
+        <label>Formation 1 : nom<input type="text" data-gc="formation" placeholder="Ta formation"></label>
+        <label>Formation 1 : prix en FC<input type="text" inputmode="numeric" data-gc="prix" placeholder="5000"></label>
+        <label>Formation 2 : nom (facultatif)<input type="text" data-gc="formation2" placeholder="Laisse vide s'il n'y en a qu'une"></label>
+        <label>Formation 2 : prix en FC<input type="text" inputmode="numeric" data-gc="prix2" placeholder="5000"></label>
+        <label>Message d'accroche (bulle près du bouton)<input type="text" data-gc="accroche" placeholder="🎁 Reçois gratuitement mon guide !"></label>
         <label>Lien WhatsApp pour la preuve (sinon celui du Contact)<input type="url" data-gc="whatsapp" placeholder="https://wa.me/..."></label>
         <label>Numéro M-Pesa<input type="text" inputmode="tel" data-gc="pay1" placeholder="0851388601"></label>
         <label>Numéro Airtel Money<input type="text" inputmode="tel" data-gc="pay2" placeholder="0992131618"></label>
@@ -1909,6 +1912,12 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 #gcFab{position:fixed;right:16px;bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:40;font:700 14px var(--body);background:var(--yellow);color:var(--on-yellow);border:0;padding:13px 18px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.45);display:flex;align-items:center;gap:8px;transition:transform .2s var(--ease)}
 #gcFab:hover{transform:translateY(-2px)}
 #gcFab:active{transform:scale(.97)}
+#gcBulle{position:fixed;right:16px;bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 62px);z-index:41;max-width:min(280px,calc(100vw - 32px));background:#f4f2ea;color:#111;display:flex;align-items:flex-start;gap:6px;padding:12px 8px 12px 14px;font:600 14px/1.35 var(--body);box-shadow:0 6px 24px rgba(0,0,0,.45);animation:gcin .35s ease}
+#gcBulle:after{content:"";position:absolute;right:26px;bottom:-8px;border:8px solid transparent;border-top-color:#f4f2ea;border-bottom:0}
+#gcBulle span{cursor:pointer;flex:1}
+#gcBulle button{background:transparent;border:0;font:700 20px/1 var(--body);color:#111;cursor:pointer;padding:0 6px}
+@keyframes gcpulse{0%,100%{box-shadow:0 6px 24px rgba(0,0,0,.45),0 0 0 0 rgba(255,214,10,.55)}50%{box-shadow:0 6px 24px rgba(0,0,0,.45),0 0 0 10px rgba(255,214,10,0)}}
+#gcFab{animation:gcpulse 2.6s ease-in-out infinite}
 #gcModal{position:fixed;inset:0;z-index:70;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:flex;justify-content:center}
 #gcModal[hidden]{display:none!important}
 #gcSheet{position:relative;width:100%;max-width:560px;height:100dvh;background:var(--bg);display:flex;flex-direction:column;border-left:1px solid var(--line);border-right:1px solid var(--line)}
@@ -1953,17 +1962,22 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 var DEF = {
   nom:"Le guide des 20 animations à copier", lien:"", formation:"Ta formation", prix:"5000",
   whatsapp:"", pay1:"0851388601", pay2:"0992131618", pay3:"0820262854",
+  formation2:"", prix2:"", accroche:"🎁 Reçois gratuitement mon guide !",
   brevo:"https://e98185ee.sibforms.com/serve/MUIFAN8f8ThZ5a86APiv5ZAhia8mNxNWBu--deg4o6otDzUb-vNM_FXoDly52dMAREg2SkfrrvloHIXd4oUCtTb1Gzb721IguBUvwZMUJ1LGOBIND0TsU7nGZUKvxG-2Ry-XewrlP8dJ4qUSpgnPLsUc58_0okEeYbZbqj3yKNQrum2rN88MQb9rBI-C0AENO3vq0RVY2mhBX1Alig=="
 };
 var PRENOM_CHAMP = "";  // nom du champ prénom dans Brevo (ex. "PRENOM" ou "FIRSTNAME") ; vide = seulement l'e-mail
 var WEBHOOK_URL = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
 /* ====================================== */
-var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS, BREVO_URL;
+var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS, BREVO_URL, FORMATIONS, ACCROCHE;
 function applyCfg(){
   var st=window.__GC_STORE||{}, g=st.guide||{}, L=st.links||{};
   function v(k){var x=(g[k]||'').toString().trim();return x||DEF[k]}
   BREVO_URL=v('brevo'); NOM_GUIDE=v('nom'); LIEN_GUIDE=v('lien'); NOM_FORMATION=v('formation');
   PRIX_CDF=parseInt(String(v('prix')).replace(/\D/g,''),10)||5000;
+  FORMATIONS=[{nom:NOM_FORMATION,prix:PRIX_CDF}];
+  var n2=(g.formation2||'').toString().trim();
+  if(n2)FORMATIONS.push({nom:n2,prix:parseInt(String(g.prix2||'').replace(/\D/g,''),10)||PRIX_CDF});
+  ACCROCHE=v('accroche');
   LIEN_WHATSAPP=(g.whatsapp||'').trim()||(L.WhatsApp||'').trim()||(document.getElementById('l-whatsapp')||{}).value||'';
   PAIEMENTS=[{nom:"M-Pesa",num:v('pay1')},{nom:"Airtel Money",num:v('pay2')},{nom:"Orange Money",num:v('pay3')}].filter(function(x){return x.num});
 }
@@ -2054,7 +2068,18 @@ async function scenario(id){
    if(/^https?:\/\//i.test(LIEN_GUIDE))await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
   avance();
 
-  await bot(id,"<b>Envie d'aller plus loin ?</b><br>Dans la formation « "+esc(NOM_FORMATION)+" », tu apprends pas à pas, de l'idée à la version finie.");
+  var f=FORMATIONS[0];
+  if(FORMATIONS.length>1){
+    await bot(id,"<b>Envie d'aller plus loin ?</b><br>J'ai "+FORMATIONS.length+" formations pour toi. Laquelle t'intéresse ?");
+    var noms=FORMATIONS.map(function(x){return x.nom+' · '+x.prix.toLocaleString('fr-FR')+' FC'});
+    var rr=await choix(id,noms.concat(['Plus tard']));
+    if(rr==='Plus tard'){await bot(id,"Pas de souci "+esc(prenom)+" ! Profite bien de ton guide 🙌");return}
+    f=FORMATIONS[noms.indexOf(rr)];
+    await bot(id,"Excellent choix 👌 « "+esc(f.nom)+" »");
+  }else{
+    await bot(id,"<b>Envie d'aller plus loin ?</b><br>Dans la formation « "+esc(f.nom)+" », tu apprends pas à pas, de l'idée à la version finie.");
+  }
+  NOM_FORMATION=f.nom;PRIX_CDF=f.prix;
   var mon=devine();
   var p=await bot(id,'<div class="gc-prix">'+PRIX_CDF.toLocaleString('fr-FR')+' FC</div><div class="gc-conv"></div>'
     +'<div class="gc-petit">Pas en RDC ? Choisis ta monnaie :</div>'
@@ -2066,9 +2091,9 @@ async function scenario(id){
   if(r2==='Plus tard'){await bot(id,"Pas de souci "+esc(prenom)+" ! Profite bien de ton guide 🙌");return}
   avance();
 
-  var h="<b>Pour payer, envoie "+PRIX_CDF.toLocaleString('fr-FR')+" FC</b> sur l'un de ces numéros :";
+  var h="<b>Pour payer « "+esc(NOM_FORMATION)+" », envoie "+PRIX_CDF.toLocaleString('fr-FR')+" FC</b> sur l'un de ces numéros :";
   PAIEMENTS.forEach(function(x){h+='<div class="gc-num"><div><small>'+esc(x.nom)+'</small><b>'+esc(x.num)+'</b></div><button type="button" class="gc-b" data-n="'+esc(x.num)+'">Copier</button></div>'});
-  h+="<div class=\"gc-petit\">Après le paiement, envoie la capture d'écran sur WhatsApp pour recevoir ton accès.</div>";
+  h+="<div class=\"gc-petit\">Après le paiement, envoie la capture d'écran sur WhatsApp, en précisant le nom de la formation, pour recevoir ton accès.</div>";
   var b=await bot(id,h);
   b.querySelectorAll('button').forEach(function(bt){bt.onclick=function(){
     try{navigator.clipboard.writeText(bt.dataset.n)}catch(e){}
@@ -2097,17 +2122,46 @@ function envoie(){
 }
 
 /* ---------- Ouvrir / fermer ---------- */
+var pret=(window.__REMOTE&&window.__REMOTE.then)?window.__REMOTE.then(function(){},function(){}):Promise.resolve();
 function ouvre(){
-  applyCfg();
   run++;etape=0;bar.style.width='0';body.innerHTML='';saisie.style.display='none';
   modal.hidden=false;document.body.classList.add('noscroll');
+  cacheBulle();
   var id=run;
-  scenario(id).catch(function(e){if(!(e instanceof Stop))console.error(e)});
+  pret.then(function(){
+    if(id!==run)return;
+    applyCfg();
+    return scenario(id);
+  }).catch(function(e){if(!(e instanceof Stop))console.error(e)});
 }
 function ferme(){
   run++;modal.hidden=true;body.innerHTML='';saisie.style.display='none';
   document.body.classList.remove('noscroll');
+  if(location.hash==='#guide'){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}}
 }
+/* bulle d'accroche près du bouton */
+var bulle=null;
+function cacheBulle(){if(bulle){bulle.remove();bulle=null}}
+function montreBulle(){
+  var admin=(location.hash==='#modifier');
+  var deja=false;try{deja=sessionStorage.getItem('gc-bulle')==='1'}catch(e){}
+  if(admin||deja||!modal.hidden)return;
+  applyCfg();
+  if(!ACCROCHE)return;
+  bulle=document.createElement('div');bulle.id='gcBulle';
+  bulle.innerHTML='<span></span><button type="button" aria-label="Fermer">×</button>';
+  bulle.firstChild.textContent=ACCROCHE;
+  bulle.firstChild.onclick=ouvre;
+  bulle.lastChild.onclick=function(e){e.stopPropagation();cacheBulle()};
+  document.body.appendChild(bulle);
+  try{sessionStorage.setItem('gc-bulle','1')}catch(e){}
+  setTimeout(cacheBulle,14000);
+}
+pret.then(function(){setTimeout(montreBulle,3500)});
+/* lien direct : tonsite/#guide ouvre le chat */
+function lienDirect(){if(location.hash==='#guide'&&modal.hidden)ouvre()}
+window.addEventListener('hashchange',lienDirect);
+pret.then(lienDirect);
 $('gcFab').addEventListener('click',ouvre);
 $('gcClose').addEventListener('click',ferme);
 modal.addEventListener('click',function(e){if(e.target===modal)ferme()});
