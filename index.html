@@ -347,6 +347,7 @@ body:not(.admin) .art-admin { display: none; }
 .fields input[type="color"] { padding: 2px; height: 44px; cursor: pointer; }
 .fields input { font: 15px var(--body); background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 9px 10px; width: 100%; }
 .fields input:focus-visible { outline-offset: 0; }
+.fields textarea { font: 15px var(--body); background: var(--bg); color: var(--fg); border: 1px solid var(--line); padding: 9px 10px; width: 100%; resize: vertical; }
 body.editing [data-edit] { outline: 1px dashed rgba(255, 214, 10, .55); outline-offset: 3px; cursor: text; }
 .editonly { display: none; }
 body.editing .editonly { display: inline; }
@@ -579,6 +580,19 @@ window.CLOUD = {
         <label>Numéro M-Pesa<input type="text" inputmode="tel" data-gc="pay1" placeholder="0851388601"></label>
         <label>Numéro Airtel Money<input type="text" inputmode="tel" data-gc="pay2" placeholder="0992131618"></label>
         <label>Numéro Orange Money<input type="text" inputmode="tel" data-gc="pay3" placeholder="0820262854"></label>
+      </div>
+    </div>
+    <div class="colors" id="gcTextes">
+      <strong>Textes du chat (guide gratuit)</strong>
+      <p style="margin:0;font-size:13px;opacity:.75">Laisse vide pour garder le texte d'origine. Tu peux écrire {prenom}, {formation} et {prix}, ils sont remplacés automatiquement. Un retour à la ligne fait un saut de ligne.</p>
+      <div class="fields">
+        <label>1. Après « Je le veux »<textarea rows="2" data-gc="t_intro" placeholder="C'est gratuit. Clique ci-dessous pour le recevoir par e-mail 👇"></textarea></label>
+        <label>2. Quand l'e-mail est envoyé<textarea rows="3" data-gc="t_envoye" placeholder="C'est envoyé ✅&#10;Tu reçois ton guide par e-mail d'ici une minute.&#10;Pense à regarder dans Promotions ou Spams."></textarea></label>
+        <label>3. Titre avant la formation<input type="text" data-gc="t_plus" placeholder="Envie d'aller plus loin ?"></label>
+        <label>4. Description (1 formation)<textarea rows="3" data-gc="t_descr" placeholder="Dans la formation « {formation} », tu apprends pas à pas, de l'idée à la version finie."></textarea></label>
+        <label>5. Question (2 formations)<input type="text" data-gc="t_plus2" placeholder="J'ai 2 formations pour toi. Laquelle t'intéresse ?"></label>
+        <label>6. Si la personne dit « Plus tard »<input type="text" data-gc="t_plustard" placeholder="Pas de souci {prenom} ! Profite bien de ton guide 🙌"></label>
+        <label>7. Consigne après le paiement<textarea rows="3" data-gc="t_paiement" placeholder="Après le paiement, envoie la capture d'écran sur WhatsApp, en précisant le nom de la formation, pour recevoir ton accès."></textarea></label>
       </div>
     </div>
     <div class="colors">
@@ -1962,13 +1976,20 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 var DEF = {
   nom:"Le guide des 20 animations à copier", lien:"", formation:"Ta formation", prix:"5000",
   whatsapp:"", pay1:"0851388601", pay2:"0992131618", pay3:"0820262854",
+  t_intro:"C'est gratuit. Clique ci-dessous pour le recevoir par e-mail 👇",
+  t_envoye:"C'est envoyé ✅\nTu reçois ton guide par e-mail d'ici une minute.\nPense à regarder dans Promotions ou Spams.",
+  t_plus:"Envie d'aller plus loin ?",
+  t_descr:"Dans la formation « {formation} », tu apprends pas à pas, de l'idée à la version finie.",
+  t_plus2:"J'ai {n} formations pour toi. Laquelle t'intéresse ?",
+  t_plustard:"Pas de souci {prenom} ! Profite bien de ton guide 🙌",
+  t_paiement:"Après le paiement, envoie la capture d'écran sur WhatsApp, en précisant le nom de la formation, pour recevoir ton accès.",
   formation2:"", prix2:"", accroche:"🎁 Reçois gratuitement mon guide !",
   brevo:"https://e98185ee.sibforms.com/serve/MUIFAN8f8ThZ5a86APiv5ZAhia8mNxNWBu--deg4o6otDzUb-vNM_FXoDly52dMAREg2SkfrrvloHIXd4oUCtTb1Gzb721IguBUvwZMUJ1LGOBIND0TsU7nGZUKvxG-2Ry-XewrlP8dJ4qUSpgnPLsUc58_0okEeYbZbqj3yKNQrum2rN88MQb9rBI-C0AENO3vq0RVY2mhBX1Alig=="
 };
 var PRENOM_CHAMP = "";  // nom du champ prénom dans Brevo (ex. "PRENOM" ou "FIRSTNAME") ; vide = seulement l'e-mail
 var WEBHOOK_URL = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
 /* ====================================== */
-var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS, BREVO_URL, FORMATIONS, ACCROCHE;
+var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS, BREVO_URL, FORMATIONS, ACCROCHE, T;
 function applyCfg(){
   var st=window.__GC_STORE||{}, g=st.guide||{}, L=st.links||{};
   function v(k){var x=(g[k]||'').toString().trim();return x||DEF[k]}
@@ -1978,6 +1999,7 @@ function applyCfg(){
   var n2=(g.formation2||'').toString().trim();
   if(n2)FORMATIONS.push({nom:n2,prix:parseInt(String(g.prix2||'').replace(/\D/g,''),10)||PRIX_CDF});
   ACCROCHE=v('accroche');
+  T={};['t_intro','t_envoye','t_plus','t_descr','t_plus2','t_plustard','t_paiement'].forEach(function(k){T[k]=v(k)});
   LIEN_WHATSAPP=(g.whatsapp||'').trim()||(L.WhatsApp||'').trim()||(document.getElementById('l-whatsapp')||{}).value||'';
   PAIEMENTS=[{nom:"M-Pesa",num:v('pay1')},{nom:"Airtel Money",num:v('pay2')},{nom:"Orange Money",num:v('pay3')}].filter(function(x){return x.num});
 }
@@ -1987,6 +2009,11 @@ var modal=$('gcModal'), body=$('gcBody'), bar=$('gcBar').firstElementChild;
 var saisie=$('gcSaisie'), champ=$('gcChamp'), form=$('gcForm');
 var run=0, etape=0, TOTAL=6, prenom="", email="", taux=null;
 
+function fmt(txt,extra){
+  var m={prenom:prenom,formation:NOM_FORMATION,prix:(PRIX_CDF||0).toLocaleString('fr-FR')+' FC',n:(FORMATIONS||[]).length};
+  if(extra)for(var k in extra)m[k]=extra[k];
+  return esc(txt).replace(/\{(\w+)\}/g,function(x,k){return k in m?esc(m[k]):x}).replace(/\r?\n/g,'<br>');
+}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function pause(ms){return new Promise(function(r){setTimeout(r,ms)})}
 function bas(){body.scrollTo({top:body.scrollHeight,behavior:'smooth'})}
@@ -2046,7 +2073,7 @@ function convertit(code){
 async function scenario(id){
   chargeTaux();
   await bot(id,'<b>🎬 '+esc(NOM_GUIDE)+'</b>');
-  await bot(id,"C'est gratuit. Clique ci-dessous pour le recevoir par e-mail 👇");
+  await bot(id,fmt(T.t_intro));
   await choix(id,['Je le veux 🎁']);avance();
 
   await bot(id,"Super ! C'est quoi ton prénom ?");
@@ -2063,21 +2090,22 @@ async function scenario(id){
   }
   avance();
   var ok=await envoie();vivant(id);
-  if(ok)await bot(id,"C'est envoyé ✅<br>Tu reçois ton guide par e-mail d'ici une minute.<br>Pense à regarder dans Promotions ou Spams.");
+  if(ok)await bot(id,fmt(T.t_envoye));
   else await bot(id,"Je n'ai pas pu envoyer l'e-mail pour le moment 😕<br>Pas de souci, ouvre ton guide directement ici 👇");
    if(/^https?:\/\//i.test(LIEN_GUIDE))await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
   avance();
 
   var f=FORMATIONS[0];
   if(FORMATIONS.length>1){
-    await bot(id,"<b>Envie d'aller plus loin ?</b><br>J'ai "+FORMATIONS.length+" formations pour toi. Laquelle t'intéresse ?");
+    await bot(id,"<b>"+fmt(T.t_plus)+"</b><br>"+fmt(T.t_plus2));
     var noms=FORMATIONS.map(function(x){return x.nom+' · '+x.prix.toLocaleString('fr-FR')+' FC'});
     var rr=await choix(id,noms.concat(['Plus tard']));
-    if(rr==='Plus tard'){await bot(id,"Pas de souci "+esc(prenom)+" ! Profite bien de ton guide 🙌");return}
+    if(rr==='Plus tard'){await bot(id,fmt(T.t_plustard));return}
     f=FORMATIONS[noms.indexOf(rr)];
     await bot(id,"Excellent choix 👌 « "+esc(f.nom)+" »");
   }else{
-    await bot(id,"<b>Envie d'aller plus loin ?</b><br>Dans la formation « "+esc(f.nom)+" », tu apprends pas à pas, de l'idée à la version finie.");
+    NOM_FORMATION=f.nom;PRIX_CDF=f.prix;
+    await bot(id,"<b>"+fmt(T.t_plus)+"</b><br>"+fmt(T.t_descr));
   }
   NOM_FORMATION=f.nom;PRIX_CDF=f.prix;
   var mon=devine();
@@ -2088,12 +2116,12 @@ async function scenario(id){
   function maj(){conv.innerHTML=sel.value==='CDF'?'':'<div style="font-size:20px;margin:4px 0">≈ <b>'+convertit(sel.value)+'</b></div>'}
   sel.onchange=maj;maj();setTimeout(maj,2500);
   var r2=await choix(id,['Je veux la formation 🚀','Plus tard']);
-  if(r2==='Plus tard'){await bot(id,"Pas de souci "+esc(prenom)+" ! Profite bien de ton guide 🙌");return}
+  if(r2==='Plus tard'){await bot(id,fmt(T.t_plustard));return}
   avance();
 
   var h="<b>Pour payer « "+esc(NOM_FORMATION)+" », envoie "+PRIX_CDF.toLocaleString('fr-FR')+" FC</b> sur l'un de ces numéros :";
   PAIEMENTS.forEach(function(x){h+='<div class="gc-num"><div><small>'+esc(x.nom)+'</small><b>'+esc(x.num)+'</b></div><button type="button" class="gc-b" data-n="'+esc(x.num)+'">Copier</button></div>'});
-  h+="<div class=\"gc-petit\">Après le paiement, envoie la capture d'écran sur WhatsApp, en précisant le nom de la formation, pour recevoir ton accès.</div>";
+  h+='<div class="gc-petit">'+fmt(T.t_paiement)+'</div>';
   var b=await bot(id,h);
   b.querySelectorAll('button').forEach(function(bt){bt.onclick=function(){
     try{navigator.clipboard.writeText(bt.dataset.n)}catch(e){}
