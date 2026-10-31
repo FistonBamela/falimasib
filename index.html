@@ -544,6 +544,7 @@ window.CLOUD = {
       <a href="#articles" data-nav="articles" class=""><span data-edit="nav-articles">Articles</span></a>
       <a href="#ads" data-nav="ads" data-adlink class=""><span data-edit="nav-ads">Publicité</span></a>
       <a href="#contact" data-nav="contact" class=""><span data-edit="nav-contact">Contact</span></a>
+      <a href="#" data-gc-open><span>🎁 Guide gratuit</span></a>
       <button class="btn" id="editBtn" type="button" aria-pressed="false">Modifier la page</button>
     </div>
   </nav>
@@ -1878,5 +1879,198 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 </script>
 
 
+
+
+<!-- ===== GUIDE GRATUIT : bouton + fenêtre de chat ===== -->
+<style id="gc-css">
+#gcFab{position:fixed;right:16px;bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:40;font:700 14px var(--body);background:var(--yellow);color:var(--on-yellow);border:0;padding:13px 18px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.45);display:flex;align-items:center;gap:8px;transition:transform .2s var(--ease)}
+#gcFab:hover{transform:translateY(-2px)}
+#gcFab:active{transform:scale(.97)}
+#gcModal{position:fixed;inset:0;z-index:70;background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);display:flex;justify-content:center}
+#gcModal[hidden]{display:none!important}
+#gcSheet{position:relative;width:100%;max-width:560px;height:100dvh;background:var(--bg);display:flex;flex-direction:column;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+#gcTop{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);font:700 14px var(--body);color:var(--fg)}
+#gcTop button{background:transparent;border:2px solid var(--yellow);color:var(--yellow);font:600 13px var(--body);padding:5px 12px;cursor:pointer}
+#gcBar{height:4px;background:var(--line)}
+#gcBar i{display:block;height:100%;width:0;background:var(--yellow);transition:width .4s}
+#gcBody{flex:1;overflow-y:auto;padding:16px 14px 24px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+.gc-bot,.gc-moi{max-width:92%;padding:13px 15px;line-height:1.45;font:400 16px/1.45 var(--body);animation:gcin .3s ease}
+.gc-bot{background:#f4f2ea;color:#111;align-self:flex-start}
+.gc-moi{background:var(--yellow);color:#111;align-self:flex-end}
+@keyframes gcin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.gc-choix{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+#gcModal button.gc-b,#gcModal a.gc-b{font:700 15px var(--body);background:var(--yellow);color:#111;border:0;padding:13px 17px;cursor:pointer;text-decoration:none;display:inline-block;text-align:center}
+#gcModal .gc-b:active{transform:scale(.97)}
+#gcSaisie{display:none;background:#000;padding:10px;border-top:2px solid var(--yellow)}
+#gcSaisie form{display:flex;gap:8px}
+#gcSaisie input{flex:1;min-width:0;font:400 16px var(--body);padding:13px;border:0;background:#fff;color:#111}
+.gc-prix{font:800 30px var(--body)}
+.gc-petit{font-size:13px;opacity:.75}
+.gc-num{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #d6d3c4;padding:10px 0}
+.gc-num b{letter-spacing:.5px}
+.gc-num small{display:block;opacity:.7}
+#gcModal .gc-num button{padding:8px 12px;font-size:13px}
+#gcModal select{font:400 15px var(--body);padding:8px;border:1px solid #aaa;background:#fff;color:#111;margin-top:6px}
+</style>
+
+<button id="gcFab" type="button" aria-haspopup="dialog">🎁 Guide gratuit</button>
+
+<div id="gcModal" role="dialog" aria-modal="true" aria-label="Guide gratuit" hidden>
+  <div id="gcSheet">
+    <div id="gcTop"><span>🎬 Guide gratuit</span><button id="gcClose" type="button">Fermer ✕</button></div>
+    <div id="gcBar"><i></i></div>
+    <div id="gcBody"></div>
+    <div id="gcSaisie"><form id="gcForm"><input id="gcChamp" autocomplete="off"><button class="gc-b" type="submit">Envoyer</button></form></div>
+  </div>
+</div>
+
+<script id="gc-js">
+(function(){
+/* =========== A MODIFIER ICI =========== */
+var NOM_GUIDE     = "Le guide des 20 animations à copier";
+var LIEN_GUIDE    = "COLLE_ICI_LE_LIEN_DE_TON_GUIDE";   // lien Google Drive / PDF
+var NOM_FORMATION = "Ta formation";                     // nom de ton cours payant
+var PRIX_CDF      = 5000;                               // prix en francs congolais
+var LIEN_WHATSAPP = "COLLE_ICI_LE_LIEN_WHATSAPP";       // lien WhatsApp pour la preuve de paiement
+var WEBHOOK_URL   = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
+var PAIEMENTS = [
+  {nom:"M-Pesa",        num:"0851388601"},
+  {nom:"Airtel Money",  num:"0992131618"},
+  {nom:"Orange Money",  num:"0820262854"}
+];
+/* ====================================== */
+
+var $=function(id){return document.getElementById(id)};
+var modal=$('gcModal'), body=$('gcBody'), bar=$('gcBar').firstElementChild;
+var saisie=$('gcSaisie'), champ=$('gcChamp'), form=$('gcForm');
+var run=0, etape=0, TOTAL=6, prenom="", email="", taux=null;
+
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function pause(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function bas(){body.scrollTo({top:body.scrollHeight,behavior:'smooth'})}
+function avance(){etape++;bar.style.width=Math.min(100,etape/TOTAL*100)+'%'}
+function Stop(){}
+function vivant(id){if(id!==run)throw new Stop()}
+
+async function bot(id,html){
+  await pause(450);vivant(id);
+  var d=document.createElement('div');d.className='gc-bot';d.innerHTML=html;body.appendChild(d);bas();return d;
+}
+function moi(t){var d=document.createElement('div');d.className='gc-moi';d.textContent=t;body.appendChild(d);bas()}
+function choix(id,opts){
+  return new Promise(function(res){
+    var w=document.createElement('div');w.className='gc-choix';
+    opts.forEach(function(o){
+      var b=document.createElement('button');b.type='button';b.className='gc-b';b.textContent=o;
+      b.onclick=function(){if(id!==run)return;w.remove();moi(o);res(o)};w.appendChild(b);
+    });
+    body.appendChild(w);bas();
+  });
+}
+function demande(id,ph,type){
+  return new Promise(function(res){
+    champ.type=type||'text';champ.placeholder=ph;champ.value='';
+    saisie.style.display='block';champ.focus();
+    form.onsubmit=function(e){
+      e.preventDefault();if(id!==run)return;
+      var v=champ.value.trim();if(!v)return;
+      saisie.style.display='none';moi(v);res(v);
+    };
+  });
+}
+function emailOk(e){return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)}
+
+/* ---------- Conversion de monnaie ---------- */
+var PAYS={CD:'CDF',US:'USD',FR:'EUR',BE:'EUR',DE:'EUR',IT:'EUR',ES:'EUR',CA:'CAD',GB:'GBP',CH:'CHF',
+ SN:'XOF',CI:'XOF',BF:'XOF',ML:'XOF',BJ:'XOF',TG:'XOF',NE:'XOF',CM:'XAF',GA:'XAF',CG:'XAF',TD:'XAF',CF:'XAF',GQ:'XAF',
+ RW:'RWF',BI:'BIF',UG:'UGX',KE:'KES',TZ:'TZS',ZM:'ZMW',AO:'AOA',MA:'MAD',DZ:'DZD',TN:'TND',NG:'NGN',GH:'GHS',ZA:'ZAR',MG:'MGA'};
+var LISTE=['CDF','USD','EUR','XOF','XAF','RWF','BIF','UGX','KES','TZS','ZMW','AOA','MAD','DZD','TND','NGN','GHS','ZAR','CAD','GBP','CHF','MGA'];
+/* taux de secours (approximatifs) si le taux en direct ne charge pas : 1 CDF = x devise */
+var SECOURS={CDF:1,USD:1/2800,EUR:1/3000,XOF:1/4.6,XAF:1/4.6,RWF:1/2.0,BIF:1/1.0,UGX:1/0.76,KES:1/21.5,TZS:1/0.9,ZMW:1/105,AOA:1/3.1,MAD:1/280,DZD:1/21,TND:1/900,NGN:1/1.9,GHS:1/260,ZAR:1/155,CAD:1/2000,GBP:1/3500,CHF:1/3200,MGA:1/0.65};
+function devine(){
+  var reg=((navigator.language||'').split('-')[1]||'').toUpperCase();
+  return PAYS[reg]||'CDF';
+}
+function chargeTaux(){
+  if(taux)return;
+  fetch('https://open.er-api.com/v6/latest/CDF').then(function(r){return r.json()}).then(function(j){if(j&&j.rates)taux=j.rates}).catch(function(){});
+}
+function convertit(code){
+  var t=(taux&&taux[code])||SECOURS[code]||1, v=PRIX_CDF*t, d=v<10?2:0;
+  return new Intl.NumberFormat('fr-FR',{maximumFractionDigits:d,minimumFractionDigits:d}).format(v)+' '+code;
+}
+
+/* ---------- Scénario ---------- */
+async function scenario(id){
+  chargeTaux();
+  await bot(id,'<b>🎬 '+esc(NOM_GUIDE)+'</b>');
+  await bot(id,"C'est gratuit. Clique ci-dessous pour le recevoir par e-mail 👇");
+  await choix(id,['Je le veux 🎁']);avance();
+
+  await bot(id,"Super ! C'est quoi ton prénom ?");
+  prenom=await demande(id,'Ton prénom');avance();
+
+  await bot(id,'Merci '+esc(prenom)+" 🙌 À quelle adresse e-mail je t'envoie ton guide ?");
+  for(;;){
+    email=await demande(id,'ton@email.com','email');
+    if(!emailOk(email)){await bot(id,"Hmm, cette adresse ne semble pas valide. Réessaie 🙂");continue}
+    await bot(id,'Tu as écrit : <b>'+esc(email)+"</b><br>C'est bien ton adresse ?");
+    var r=await choix(id,["✅ Oui, c'est correct","✏️ Modifier"]);
+    if(r.indexOf('✅')===0)break;
+    await bot(id,"D'accord, écris-la à nouveau.");
+  }
+  avance();envoie();
+
+  await bot(id,"C'est envoyé ✅<br>Tu reçois ton guide par e-mail d'ici une minute.<br>Pense à regarder dans Promotions ou Spams.");
+  await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
+  avance();
+
+  await bot(id,"<b>Envie d'aller plus loin ?</b><br>Dans la formation « "+esc(NOM_FORMATION)+" », tu apprends pas à pas, de l'idée à la version finie.");
+  var mon=devine();
+  var p=await bot(id,'<div class="gc-prix">'+PRIX_CDF.toLocaleString('fr-FR')+' FC</div><div class="gc-conv"></div>'
+    +'<div class="gc-petit">Pas en RDC ? Choisis ta monnaie :</div>'
+    +'<select class="gc-sel">'+LISTE.map(function(c){return '<option'+(c===mon?' selected':'')+'>'+c+'</option>'}).join('')+'</select>');
+  var sel=p.querySelector('.gc-sel'), conv=p.querySelector('.gc-conv');
+  function maj(){conv.innerHTML=sel.value==='CDF'?'':'<div style="font-size:20px;margin:4px 0">≈ <b>'+convertit(sel.value)+'</b></div>'}
+  sel.onchange=maj;maj();setTimeout(maj,2500);
+  var r2=await choix(id,['Je veux la formation 🚀','Plus tard']);
+  if(r2==='Plus tard'){await bot(id,"Pas de souci "+esc(prenom)+" ! Profite bien de ton guide 🙌");return}
+  avance();
+
+  var h="<b>Pour payer, envoie "+PRIX_CDF.toLocaleString('fr-FR')+" FC</b> sur l'un de ces numéros :";
+  PAIEMENTS.forEach(function(x){h+='<div class="gc-num"><div><small>'+esc(x.nom)+'</small><b>'+esc(x.num)+'</b></div><button type="button" class="gc-b" data-n="'+esc(x.num)+'">Copier</button></div>'});
+  h+="<div class=\"gc-petit\">Après le paiement, envoie la capture d'écran sur WhatsApp pour recevoir ton accès.</div>";
+  var b=await bot(id,h);
+  b.querySelectorAll('button').forEach(function(bt){bt.onclick=function(){
+    try{navigator.clipboard.writeText(bt.dataset.n)}catch(e){}
+    bt.textContent='Copié ✓';setTimeout(function(){bt.textContent='Copier'},1500)}});
+  await bot(id,'<a class="gc-b" href="'+esc(LIEN_WHATSAPP)+'" target="_blank" rel="noopener">💬 Envoyer ma preuve sur WhatsApp</a>');
+  avance();
+}
+function envoie(){
+  if(!WEBHOOK_URL)return;
+  try{fetch(WEBHOOK_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prenom:prenom,email:email,guide:NOM_GUIDE,date:new Date().toISOString()})}).catch(function(){})}catch(e){}
+}
+
+/* ---------- Ouvrir / fermer ---------- */
+function ouvre(){
+  run++;etape=0;bar.style.width='0';body.innerHTML='';saisie.style.display='none';
+  modal.hidden=false;document.body.classList.add('noscroll');
+  var id=run;
+  scenario(id).catch(function(e){if(!(e instanceof Stop))console.error(e)});
+}
+function ferme(){
+  run++;modal.hidden=true;body.innerHTML='';saisie.style.display='none';
+  document.body.classList.remove('noscroll');
+}
+$('gcFab').addEventListener('click',ouvre);
+$('gcClose').addEventListener('click',ferme);
+modal.addEventListener('click',function(e){if(e.target===modal)ferme()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)ferme()});
+document.querySelectorAll('[data-gc-open]').forEach(function(a){a.addEventListener('click',function(e){e.preventDefault();ouvre()})});
+})();
+</script>
+<!-- ===== FIN GUIDE GRATUIT ===== -->
 
 </body></html>
