@@ -567,6 +567,7 @@ window.CLOUD = {
     <div class="colors" id="gcPanel">
       <strong>Guide gratuit (chat)</strong>
       <div class="fields">
+        <label>Lien du formulaire Brevo (envoie l'e-mail)<input type="url" data-gc="brevo" placeholder="https://xxxx.sibforms.com/serve/..."></label>
         <label>Nom du guide<input type="text" data-gc="nom" placeholder="Le guide des 20 animations à copier"></label>
         <label>Lien du guide (Drive, PDF...)<input type="url" data-gc="lien" placeholder="https://drive.google.com/..."></label>
         <label>Nom de la formation<input type="text" data-gc="formation" placeholder="Ta formation"></label>
@@ -1951,15 +1952,17 @@ window.__REMOTE.then(function (r) { boot(r.data, r.state); });
 /* ====== VALEURS PAR DEFAUT (modifiables depuis #modifier > « Guide gratuit (chat) ») ====== */
 var DEF = {
   nom:"Le guide des 20 animations à copier", lien:"", formation:"Ta formation", prix:"5000",
-  whatsapp:"", pay1:"0851388601", pay2:"0992131618", pay3:"0820262854"
+  whatsapp:"", pay1:"0851388601", pay2:"0992131618", pay3:"0820262854",
+  brevo:"https://e98185ee.sibforms.com/serve/MUIFAN8f8ThZ5a86APiv5ZAhia8mNxNWBu--deg4o6otDzUb-vNM_FXoDly52dMAREg2SkfrrvloHIXd4oUCtTb1Gzb721IguBUvwZMUJ1LGOBIND0TsU7nGZUKvxG-2Ry-XewrlP8dJ4qUSpgnPLsUc58_0okEeYbZbqj3yKNQrum2rN88MQb9rBI-C0AENO3vq0RVY2mhBX1Alig=="
 };
+var PRENOM_CHAMP = "";  // nom du champ prénom dans Brevo (ex. "PRENOM" ou "FIRSTNAME") ; vide = seulement l'e-mail
 var WEBHOOK_URL = "";  // optionnel : lien Make / Brevo / Formspree qui reçoit prénom + e-mail
 /* ====================================== */
-var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS;
+var NOM_GUIDE, LIEN_GUIDE, NOM_FORMATION, PRIX_CDF, LIEN_WHATSAPP, PAIEMENTS, BREVO_URL;
 function applyCfg(){
   var st=window.__GC_STORE||{}, g=st.guide||{}, L=st.links||{};
   function v(k){var x=(g[k]||'').toString().trim();return x||DEF[k]}
-  NOM_GUIDE=v('nom'); LIEN_GUIDE=v('lien'); NOM_FORMATION=v('formation');
+  BREVO_URL=v('brevo'); NOM_GUIDE=v('nom'); LIEN_GUIDE=v('lien'); NOM_FORMATION=v('formation');
   PRIX_CDF=parseInt(String(v('prix')).replace(/\D/g,''),10)||5000;
   LIEN_WHATSAPP=(g.whatsapp||'').trim()||(L.WhatsApp||'').trim()||(document.getElementById('l-whatsapp')||{}).value||'';
   PAIEMENTS=[{nom:"M-Pesa",num:v('pay1')},{nom:"Airtel Money",num:v('pay2')},{nom:"Orange Money",num:v('pay3')}].filter(function(x){return x.num});
@@ -2044,9 +2047,10 @@ async function scenario(id){
     if(r.indexOf('✅')===0)break;
     await bot(id,"D'accord, écris-la à nouveau.");
   }
-  avance();envoie();
-
-  await bot(id,"C'est envoyé ✅<br>Tu reçois ton guide par e-mail d'ici une minute.<br>Pense à regarder dans Promotions ou Spams.");
+  avance();
+  var ok=await envoie();vivant(id);
+  if(ok)await bot(id,"C'est envoyé ✅<br>Tu reçois ton guide par e-mail d'ici une minute.<br>Pense à regarder dans Promotions ou Spams.");
+  else await bot(id,"Je n'ai pas pu envoyer l'e-mail pour le moment 😕<br>Pas de souci, ouvre ton guide directement ici 👇");
    if(/^https?:\/\//i.test(LIEN_GUIDE))await bot(id,'Tu peux aussi l\'ouvrir tout de suite :<br><br><a class="gc-b" href="'+esc(LIEN_GUIDE)+'" target="_blank" rel="noopener">📥 Ouvrir le guide</a>');
   avance();
 
@@ -2073,9 +2077,23 @@ async function scenario(id){
   avance();
 }
 function envoie(){
-  if(!WEBHOOK_URL)return;
-  try{fetch(WEBHOOK_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({prenom:prenom,email:email,guide:NOM_GUIDE,date:new Date().toISOString()})}).catch(function(){})}catch(e){}
+  var jobs=[];
+  if(/^https:\/\//i.test(BREVO_URL)){
+    var fd=new FormData();
+    fd.append('EMAIL',email);
+    if(PRENOM_CHAMP)fd.append(PRENOM_CHAMP,prenom);
+    fd.append('email_address_check','');
+    fd.append('locale','fr');
+    fd.append('html_type','simple');
+    jobs.push(fetch(BREVO_URL,{method:'POST',mode:'no-cors',body:fd}).then(function(){return true},function(){return false}));
+  }
+  if(WEBHOOK_URL){
+    jobs.push(fetch(WEBHOOK_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prenom:prenom,email:email,guide:NOM_GUIDE,date:new Date().toISOString()})}).then(function(){return true},function(){return false}));
+  }
+  if(!jobs.length)return Promise.resolve(false);
+  var limite=new Promise(function(r){setTimeout(function(){r(false)},9000)});
+  return Promise.race([Promise.all(jobs).then(function(a){return a.every(Boolean)}),limite]);
 }
 
 /* ---------- Ouvrir / fermer ---------- */
